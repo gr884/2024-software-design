@@ -1,0 +1,143 @@
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using TMPro;
+using System.Collections;
+using System.Collections.Generic;
+
+public class PatternGameManager : MonoBehaviour
+{
+    // UI 요소
+    public TextMeshProUGUI patternText, timerText, scoreText;
+    public Button easyButton, normalButton, hardButton, closeButton;
+    public GameObject mainPanel, gameUIPanel;
+
+    // 게임 관련 변수
+    private int score = 0, currentIndex = 0;
+    private float gameTime = 60f;       // 전체 게임 시간
+    private float patternInterval = 6f; // 패턴 입력 제한 시간
+    private float timeRemaining = 0f;   // 남은 시간
+    private string currentPattern = "";
+    private List<char> patternList = new List<char>();
+    private bool isPatternActive = false;   // 현재 패턴 활성상태 여부
+    private Coroutine patternCoroutine;     // 패턴 카운트다운 코루틴
+
+    private void Start() {
+        // 난이도 버튼따라 시간 다르게 설정
+        easyButton.onClick.AddListener(() => StartGame(6f));    // easy
+        normalButton.onClick.AddListener(() => StartGame(4f));  // normal
+        hardButton.onClick.AddListener(() => StartGame(2f));    // hard
+        closeButton.onClick.AddListener(CloseGame);     // 종료 버튼
+        ResetUI();  // 초기 UI 설정
+    }
+
+    private void StartGame(float interval) {    // 게임 시작
+        patternInterval = interval;
+        mainPanel.SetActive(false);     // MainPanel 비활성화
+        gameUIPanel.SetActive(true);    // 게임 UI 패널 활성화
+        score = 0;  // 점수 초기화
+        timeRemaining = gameTime;
+        GeneratePattern();  // 첫 패턴을 바로 생성
+        StartCoroutine(GameRoutine());  // 타이머 시작
+    }
+
+    private IEnumerator GameRoutine() { // 전체 시간 카운트다운
+        while (timeRemaining > 0)
+        {
+            yield return new WaitForSeconds(1f);
+            timeRemaining -= 1f;
+            timerText.text = "Time: " + Mathf.Ceil(timeRemaining).ToString();
+        }
+        EndGame(); // 시간 다되면 게임 종료
+    }
+
+    private void GeneratePattern() {    // 새로운 패턴 생성
+        patternList.Clear();
+        currentIndex = 0;
+        currentPattern = "";
+
+        // 랜덤으로 6개의 알파벳 생성
+        for (int i = 0; i < 6; i++)
+        {
+            char randomChar = (char)('A' + Random.Range(0, 26));
+            patternList.Add(randomChar);
+            currentPattern += randomChar;
+        }
+
+        patternText.text = currentPattern; // 생성된 패턴 화면에 표시
+        isPatternActive = true; // 패턴 활성상태 표시
+
+        // 기존 패턴 카운트다운이 있으면 중지
+        if (patternCoroutine != null)
+            StopCoroutine(patternCoroutine);
+        // 새로운 패턴 카운트다운 시작
+        patternCoroutine = StartCoroutine(PatternCountdown());
+    }
+
+    private IEnumerator PatternCountdown() {    // 패턴 입력 제한시간 카운트다운
+        float patternTimeRemaining = patternInterval;
+        while (patternTimeRemaining > 0)
+        {
+            yield return new WaitForSeconds(1f);
+            patternTimeRemaining -= 1f;
+            if (!isPatternActive)   // 패턴이 완료 시 즉시 종료
+            {
+                yield break;
+            }
+        }
+        if (patternList.Count > 0)  // 시간내 입력 못하면 새로운 패턴을 생성
+            GeneratePattern();
+    }
+
+    private void Update() { // 사용자 입력 처리
+        if (patternList.Count > 0 && Input.anyKeyDown)  // 패턴 리스트가 안비었고 키를 눌렀으면
+        {
+            string input = Input.inputString.ToUpper(); // 입력 대문자로 변환
+            if (input.Length > 0 && input[0] == patternList[currentIndex])
+            {
+                currentIndex++;
+                if (currentIndex < patternList.Count)
+                    patternText.text = patternText.text.Substring(1); // 입력한 문자 제거
+                else
+                {
+                    // 모든 문자를 맞췄으면 새 패턴 생성
+                    isPatternActive = false; // 현재 패턴 완료 설정하고
+                    StopCoroutine(patternCoroutine); // 현재 패턴 카운트다운 중지
+                    GeneratePattern(); // 새로운 패턴 생성
+                }
+                score++;
+                scoreText.text = "Score: " + score.ToString(); // 점수 갱신
+            }
+        }
+
+        // ESC를 눌렀으면 메인 패널로 돌아감
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            EndGame();  // 게임 종료
+            ResetUI();  // UI 초기화
+            mainPanel.SetActive(true);      // 메인 패널 열고
+            gameUIPanel.SetActive(false);   // 게임 패널 닫기
+        }
+    }
+
+    private void EndGame() {    // 게임 종료
+        StopAllCoroutines();    // 모든 코루틴 중지
+        timerText.text = "Time: 0";
+        mainPanel.SetActive(true);      // 메인 패널 열고
+        gameUIPanel.SetActive(false);   // 게임 패널 닫기
+        ResetUI();  // 게임 종료 시 UI도 초기화
+    }
+
+    private void ResetUI() {    // UI 초기화
+        // 초기 UI 상태
+        score = 0;
+        timeRemaining = gameTime;
+        scoreText.text = "Score: 0";
+        timerText.text = "Time: 60";
+        patternText.text = "";
+    }
+
+    private void CloseGame() {  // close 버튼 누르면
+        SceneManager.LoadScene("MainScene"); // 메인 메뉴 씬으로 전환
+    }
+}
