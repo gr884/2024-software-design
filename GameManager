@@ -1,0 +1,18 @@
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public class GameManager : MonoBehaviour
+{
+    public void EndGame() { // 게임 종료
+        Debug.Log("Game Ended");
+        Application.Quit();
+    }
+
+    public void SetAim() {  // aim 게임으로 이동
+        SceneManager.LoadScene("AimScene");
+    }
+
+    public void SetPattern()  { // 패턴 게임으로 이동
+        SceneManager.LoadScene("PatternScene");
+    }
+}
