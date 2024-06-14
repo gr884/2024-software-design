@@ -1,0 +1,146 @@
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using TMPro;
+using System.Collections;
+using System.Collections.Generic;
+
+public class AimGameManager : MonoBehaviour
+{
+    // UI 및 게임 오브젝트 관련 변수들
+    public GameObject aimObjectPrefab; // 에임 오브젝트의 프리팹
+    public Transform canvasTransform; // 캔버스의 Transform
+    public Button easyButton, normalButton, hardButton, closeButton;
+    public TextMeshProUGUI timerText, scoreText;
+    public GameObject mainPanel, gameUIPanel; // 패널
+    public Camera mainCamera; // 메인 카메라
+    public RectTransform panelTransform; // 패널 Transform
+
+    private int score = 0; // 현재 점수
+    private float spawnInterval = 1.0f; // 오브젝트 스폰 간격
+    private float gameTime = 60f;       // 전체 게임 시간
+    private float aimLifetime = 4.0f;   // 오브젝트 생명 주기
+    private float timeRemaining;        // 남은 시간
+
+    private List<GameObject> activeAimObjects = new List<GameObject>(); // 활성화된 오브젝트 리스트
+
+    private void Start() {  // 시작 함수
+        // 난이도 따라 누른 버튼으로 게임 시작
+        easyButton.onClick.AddListener(() => StartGame(1.0f, 4.0f));    // easy
+        normalButton.onClick.AddListener(() => StartGame(0.7f, 2.0f));  // normal
+        hardButton.onClick.AddListener(() => StartGame(0.5f, 1.0f));    // hard
+        closeButton.onClick.AddListener(CloseGame); // close는 종료 함수로
+        ResetUI();              // 초기 UI 설정
+        SetCameraPosition();    // 카메라 설정
+    }
+
+    private void SetCameraPosition() {
+        // 메인 카메라의 위치 설정
+        mainCamera.transform.position = new Vector3(panelTransform.position.x, panelTransform.position.y, -348);
+        mainCamera.transform.LookAt(panelTransform);
+    }
+
+    private void StartGame(float interval, float lifetime) {    // 게임 시작 함수
+        spawnInterval = interval; 
+        aimLifetime = lifetime;
+        mainPanel.SetActive(false);     // 메인 패널 끄고
+        gameUIPanel.SetActive(true);    // 게임 패널 활성화
+        score = 0;
+        timeRemaining = gameTime;   // 게임 시간 초기화
+        StartCoroutine(GameRoutine());
+    }
+
+    private IEnumerator GameRoutine() {
+        while (timeRemaining > 0)
+        {
+            yield return new WaitForSeconds(spawnInterval);
+            timeRemaining -= spawnInterval;
+            timerText.text = "Time: " + Mathf.Ceil(timeRemaining).ToString();
+            SpawnAimObject();
+        }
+        EndGame();
+    }
+
+    private void SpawnAimObject() {
+        // 패널의 위치 / 크기 사용해서 스폰 범위 계산
+        float xMin = panelTransform.anchoredPosition.x - panelTransform.rect.width / 2;
+        float xMax = panelTransform.anchoredPosition.x + panelTransform.rect.width / 2;
+        float yMin = panelTransform.anchoredPosition.y - panelTransform.rect.height / 2;
+        float yMax = panelTransform.anchoredPosition.y + panelTransform.rect.height / 2;
+
+        Vector2 randomPosition = new Vector2(Random.Range(xMin, xMax), Random.Range(yMin, yMax));
+        GameObject aimObject = Instantiate(aimObjectPrefab, canvasTransform);
+        RectTransform rectTransform = aimObject.GetComponent<RectTransform>();
+
+        if (rectTransform == null)
+        {
+            Debug.LogError("RectTransform is missing on AimObject prefab.");
+            return;
+        }
+
+        AimObject aimObjectScript = aimObject.GetComponent<AimObject>();
+        Button button = aimObject.GetComponent<Button>();
+
+        if (aimObjectScript == null)
+        {
+            Debug.LogError("AimObject script is missing on AimObject prefab.");
+            return;
+        }
+
+        if (button == null)
+        {
+            Debug.LogError("Button component is missing on AimObject prefab.");
+            return;
+        }
+
+        rectTransform.anchoredPosition = randomPosition;
+        aimObjectScript.SetLifetime(aimLifetime);
+
+        button.onClick.AddListener(() => {
+            score++;
+            scoreText.text = "Score: " + score.ToString();
+            activeAimObjects.Remove(aimObject); // 오브젝트 제거 시 리스트에서 제거
+            Destroy(aimObject);
+        });
+
+        activeAimObjects.Add(aimObject);    // 생성된 오브젝트를 리스트에 추가
+    }
+
+    private void Update() {
+        // ESC 키 누르면 중단
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            EndGame();
+            ResetUI(); // UI 초기화
+            mainPanel.SetActive(true);
+            gameUIPanel.SetActive(false);
+        }
+    }
+
+    private void EndGame() {
+        StopAllCoroutines(); // 모두 중지
+        timerText.text = "Time: 0";
+        mainPanel.SetActive(true);      // 메인 패널 키고
+        gameUIPanel.SetActive(false);   // 게임 패널 끄기
+        ClearAimObjects();  // 모든 오브젝트 제거
+        ResetUI();  // UI 초기화
+    }
+
+    private void ClearAimObjects() {
+        foreach (GameObject aimObject in activeAimObjects)
+            Destroy(aimObject); // 모든 오브젝트 제거
+        activeAimObjects.Clear();   // 리스트 비우기
+    }
+
+    private void ResetUI() {
+        // 초기 UI 상태 설정
+        score = 0;
+        timeRemaining = gameTime;
+        scoreText.text = "Score: 0";
+        timerText.text = "Time: 60";
+    }
+
+    private void CloseGame() {
+        SceneManager.LoadScene("MainScene"); // 메인 메뉴 씬으로 전환
+    }
+}
